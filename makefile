@@ -9,3 +9,23 @@ run-3:
 
 run-4:
 	cargo run -- --host-port 8083 -o 8081 -o 8082 -o 8080
+
+run-release-1:
+	./target/release/kv --host-port 8080 -o 8081 -o 8082 -o 8083
+
+run-release-2:
+	./target/release/kv --host-port 8081 -o 8080 -o 8082 -o 8083
+
+run-release-3:
+	./target/release/kv --host-port 8082 -o 8081 -o 8080 -o 8083
+
+run-release-4:
+	./target/release/kv --host-port 8083 -o 8081 -o 8082 -o 8080
+
+
+run-parallel:
+	seq 1 4 | parallel -j 4 'make run-{} > ./logs/run_{}.log 2>&1'
+
+
+run-release-parallel:
+	seq 1 4 | parallel -j 4 'make run-release-{} > ./logs/run_{}.log 2>&1'

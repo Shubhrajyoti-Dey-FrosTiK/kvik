@@ -3,8 +3,12 @@ pub mod rpc;
 use clap::Parser;
 use init::connect_to_other_node;
 use listen::listen_for_connections;
+use tracing::info;
 pub mod init;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 use tokio::{spawn, time::sleep};
 
 #[derive(Parser, Debug)]
@@ -20,8 +24,8 @@ struct Args {
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
+    info!("NODE STARTED AT  -  {:#?}", SystemTime::now());
     let args = Arc::new(Args::parse());
-    sleep(Duration::from_secs(2)).await;
 
     spawn(listen_for_connections(args.host_port.clone()));
 
@@ -29,5 +33,6 @@ async fn main() {
         spawn(connect_to_other_node(other_nodes.clone()));
     }
 
-    loop {}
+    // loop {}
+    sleep(Duration::from_secs(5)).await;
 }
