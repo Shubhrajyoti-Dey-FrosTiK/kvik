@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package kv;
+
+service KV {
+	rpc Heartbeat (HeartbeatRequest) returns (HeartbeatResponse);
+}
+
+message HeartbeatRequest {
+   uint32 port = 1;
+}
+
+message HeartbeatResponse {
+	uint64 active_time = 1;
+}
