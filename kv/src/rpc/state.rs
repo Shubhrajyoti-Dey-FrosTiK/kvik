@@ -1,6 +1,7 @@
-use super::kv::KV;
+use std::ops::DerefMut;
+
+use super::kv::{Role, KV};
 use serde::{Deserialize, Serialize};
-use serde_json::from_str;
 
 #[derive(Serialize, Deserialize)]
 pub struct Log {
@@ -32,6 +33,12 @@ impl KV {
         return Some(voted_for.unwrap());
     }
 
+    pub async fn set_voted_for(&self, voted_for: u32) {
+        self.persistent_store
+            .put::<u32>("votedFor", &voted_for)
+            .unwrap();
+    }
+
     pub async fn get_last_log_term(&self) -> u64 {
         let logs = self.persistent_store.get_unwrap::<Vec<Log>>("log").unwrap();
 
@@ -40,5 +47,37 @@ impl KV {
         }
 
         return 0;
+    }
+
+    pub async fn get_last_log_index(&self) -> u64 {
+        let logs = self.persistent_store.get_unwrap::<Vec<Log>>("log").unwrap();
+
+        return logs.len() as u64;
+    }
+
+    pub async fn get_role(&self) -> Role {
+        return self.role.lock().await.clone();
+    }
+
+    pub async fn set_role(&self, role: Role) {
+        self.role.lock().await.set(role);
+    }
+
+    pub async fn get_next_election_time(&self) -> u128 {
+        self.next_election_time.lock().await.clone()
+    }
+
+    pub async fn set_next_election_time(&self, time: u128) {
+        let mut election_time = self.next_election_time.lock().await;
+        *election_time.deref_mut() = time;
+    }
+
+    pub async fn get_last_appendentry_time(&self) -> Option<u128> {
+        self.last_append_entry_time.lock().await.clone()
+    }
+
+    pub async fn set_last_appendentry_time(&self, time: u128) {
+        let mut last_appendentry_time = self.last_append_entry_time.lock().await;
+        *last_appendentry_time.deref_mut() = Some(time);
     }
 }

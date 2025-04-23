@@ -4,7 +4,7 @@ use clap::Parser;
 use connect::connect_to_other_node;
 use listen::listen_for_connections;
 use ps::get_ps_instance;
-use rpc::{election_timeout::run_election_timeout, kv::KV};
+use rpc::{election_timeout::run_election_timeout, kv::KV, leader_actions::run_leader_actions};
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -46,16 +46,29 @@ async fn main() {
         commit_index: 0,
         last_applied: 0,
         leader_state: None, // Not a leader in the beginning
-        next_check_time: rand::random_range(150000000..300000000) + now, // in nanos
+        next_election_time: Arc::new(Mutex::new(
+            rand::random_range(
+                Duration::from_millis(150).as_nanos()..Duration::from_millis(300).as_nanos(),
+            ) + now,
+        )), // in nanos
+        last_append_entry_time: Arc::new(Mutex::new(None)),
+        role: Arc::new(Mutex::new(rpc::kv::Role::Follower)),
         conn_map: Arc::new(Mutex::new(vec![])),
     }; // Replace with your actual implementation
 
     let kv_service_cloned = Arc::new(kv_service.clone());
     let (tx, rx) = broadcast::channel::<bool>(1);
+    let exit_rx = Arc::new(Mutex::new(rx));
 
     spawn(run_election_timeout(
         kv_service_cloned.clone(),
-        Arc::new(Mutex::new(rx)),
+        exit_rx.clone(),
+        args.other_nodes.len().clone() + 1,
+    ));
+
+    spawn(run_leader_actions(
+        kv_service_cloned.clone(),
+        exit_rx.clone(),
     ));
 
     for conn_port in args.other_nodes.clone() {

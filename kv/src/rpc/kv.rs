@@ -16,6 +16,19 @@ pub struct ConnMap {
     pub client: kv_client::KvClient<Channel>,
 }
 
+#[derive(Clone, PartialEq, Eq)]
+pub enum Role {
+    Leader,
+    Follower,
+    Candidate,
+}
+
+impl Role {
+    pub fn set(&mut self, role: Self) {
+        *self = role;
+    }
+}
+
 #[derive(Clone)]
 pub struct KV {
     pub host_port: u32,
@@ -23,10 +36,11 @@ pub struct KV {
     pub persistent_store: MicroKV,
     pub commit_index: u64, // index of highest log entry known to be committed (initialized to 0, increases monotonically)
     pub last_applied: u64, // index of highest log entry applied to state machine (initialized to 0, increases monotonically)
-
+    pub role: Arc<Mutex<Role>>,
     pub leader_state: Option<LeaderState>, // state of the leader node | Only if the node is the leader, this data is present
 
-    pub next_check_time: u128, // this is the time the node should have been sent a AppendEntries Request
+    pub next_election_time: Arc<Mutex<u128>>, // this is the time the node should have been sent a AppendEntries Request
+    pub last_append_entry_time: Arc<Mutex<Option<u128>>>, // this is the last time the node has received appendEntry
     pub conn_map: Arc<Mutex<Vec<ConnMap>>>,
 }
 
