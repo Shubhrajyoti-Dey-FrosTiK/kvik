@@ -33,12 +33,7 @@ impl KV {
     }
 
     pub async fn get_last_log_term(&self) -> u64 {
-        let log_string = self
-            .persistent_store
-            .get_unwrap::<String>("log")
-            .unwrap_or("[]".to_string());
-
-        let logs: Vec<Log> = from_str(&log_string).unwrap();
+        let logs = self.persistent_store.get_unwrap::<Vec<Log>>("log").unwrap();
 
         if logs.len() > 0 {
             return logs.get(logs.len() - 1).unwrap().term;

@@ -4,17 +4,14 @@ use clap::Parser;
 use connect::connect_to_other_node;
 use listen::listen_for_connections;
 use ps::get_ps_instance;
-use rpc::{
-    election_timeout::run_election_timeout,
-    kv::{ConnMap, KV},
-};
+use rpc::{election_timeout::run_election_timeout, kv::KV};
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::{
     spawn,
-    sync::{broadcast, Mutex, Notify},
+    sync::{broadcast, Mutex},
     time::sleep,
 };
 use tracing::info;
@@ -62,15 +59,13 @@ async fn main() {
     ));
 
     for conn_port in args.other_nodes.clone() {
-        let conn_client = connect_to_other_node(conn_port.clone()).await.unwrap();
-        if conn_client.is_some() {
-            kv_service.conn_map.lock().await.push(ConnMap {
-                client: conn_client.unwrap(),
-                conn_port,
-            });
-        }
+        spawn(connect_to_other_node(
+            conn_port.clone(),
+            kv_service_cloned.clone(),
+        ));
     }
 
-    // listen_for_connections(kv_service).await.unwrap();
+    spawn(listen_for_connections(kv_service));
+    sleep(Duration::from_secs(5)).await;
     tx.send(true).unwrap(); // exit
 }

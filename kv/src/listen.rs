@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::rpc::kv::{kv_server::KvServer, KV};
 use anyhow::Result;
 use tonic::transport::Server;
