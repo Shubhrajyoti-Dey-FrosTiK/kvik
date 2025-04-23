@@ -14,13 +14,17 @@ tokio = { version = "1.0", features = [
 ] }
 anyhow = { workspace = true }
 dotenv = { workspace = true }
-redis = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
 clap = { version = "4.5.36", features = ["derive"] }
-
+tower = "*"
+dashmap = "*"
+futures = "*"
+prost-types = "0.13.5"
+rand = { version = "*", features = ["thread_rng"] }
+microkv = { version = "0.2.9" }
 
 [build-dependencies]
 tonic-build = "0.13.0"

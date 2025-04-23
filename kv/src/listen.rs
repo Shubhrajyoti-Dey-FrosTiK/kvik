@@ -1,18 +1,22 @@
+use std::sync::Arc;
+
 use crate::rpc::kv::{kv_server::KvServer, KV};
 use anyhow::Result;
 use tonic::transport::Server;
-use tracing::info;
+use tracing::{error, info};
 
-pub async fn listen_for_connections(host_port: u32) -> Result<()> {
-    let addr: std::net::SocketAddr = format!("0.0.0.0:{}", host_port.clone()).parse().unwrap();
-    let kv_service = KV::default(); // Replace with your actual implementation
+pub async fn listen_for_connections(kv: KV) -> Result<()> {
+    let addr: std::net::SocketAddr = format!("0.0.0.0:{}", kv.host_port.clone()).parse().unwrap();
 
     info!("Starting to listen to {}", addr.clone());
-    Server::builder()
-        .add_service(KvServer::new(kv_service))
+    let server = Server::builder()
+        .add_service(KvServer::new(kv))
         .serve(addr)
-        .await
-        .unwrap();
+        .await;
+
+    if server.is_err() {
+        error!("{}", server.err().unwrap());
+    }
 
     Ok(())
 }
