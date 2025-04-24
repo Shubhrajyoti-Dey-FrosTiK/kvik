@@ -1,11 +1,11 @@
+use super::kv::{AppendEntriesRequest, Role, KV};
+use crate::connect::get_connection_client;
+use std::{sync::Arc, time::Duration};
 use tokio::{
     sync::{broadcast::Receiver, Mutex},
     time::sleep,
 };
 use tracing::{info, warn};
-
-use super::kv::{AppendEntriesRequest, Role, KV};
-use std::{sync::Arc, time::Duration};
 
 pub async fn run_leader_actions(kv_service: Arc<KV>, exit: Arc<Mutex<Receiver<bool>>>) {
     loop {
@@ -19,12 +19,14 @@ pub async fn run_leader_actions(kv_service: Arc<KV>, exit: Arc<Mutex<Receiver<bo
             continue;
         }
 
-        sleep(Duration::from_millis(150)).await;
-
         // Send AppendEntriesRPC to all connected clients
-        for conn_map in kv_service.conn_map.lock().await.iter_mut() {
-            let append_entries_response = conn_map
-                .client
+        for connected_host in kv_service.connected_hosts.lock().await.iter() {
+            let client = get_connection_client(*connected_host).await;
+            if client.is_none() {
+                continue;
+            }
+            let mut client = client.unwrap();
+            let append_entries_response = client
                 .append_entries(AppendEntriesRequest {
                     term: kv_service.get_current_term().await,
                     leader_id: kv_service.host_port.clone(),
@@ -50,16 +52,12 @@ pub async fn run_leader_actions(kv_service: Arc<KV>, exit: Arc<Mutex<Receiver<bo
                         .set_current_term(append_entries_response.term)
                         .await;
                 }
-                info!(
-                    "Success appending entries to {}",
-                    conn_map.conn_port.clone()
-                );
+                info!("Success appending entries to {}", connected_host);
             } else {
-                warn!(
-                    "Didnt succeed appending entries to {}",
-                    conn_map.conn_port.clone()
-                )
+                warn!("Didnt succeed appending entries to {}", connected_host)
             }
         }
+
+        sleep(Duration::from_millis(50)).await;
     }
 }

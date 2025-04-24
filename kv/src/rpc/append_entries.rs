@@ -2,6 +2,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::kv::{AppendEntriesRequest, AppendEntriesResponse, Role, KV};
 use tonic::{Request, Response, Status};
+use tracing::info;
 
 impl KV {
     pub async fn append_entries_handler(
@@ -26,17 +27,16 @@ impl KV {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let last_appendentry_time = self
-            .get_last_appendentry_time()
-            .await
-            .unwrap_or(self.start_time as u128);
         let upper_limit = Duration::from_millis(300).as_nanos();
+        let lower_limit = Duration::from_millis(200).as_nanos();
         self.set_last_appendentry_time(now).await;
-        self.set_next_election_time(
-            rand::random_range((now - last_appendentry_time).min(upper_limit - 1)..upper_limit)
-                + now,
-        )
-        .await;
+        self.set_next_election_time(rand::random_range(lower_limit..upper_limit) + now)
+            .await;
+        let current_role = self.get_role().await;
+        if current_role != Role::Follower {
+            info!("Switched to follower from {:?}", current_role);
+            self.set_role(Role::Follower).await;
+        }
 
         Ok(Response::new(AppendEntriesResponse {
             success: true,

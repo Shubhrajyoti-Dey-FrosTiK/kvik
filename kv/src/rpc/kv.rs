@@ -16,7 +16,7 @@ pub struct ConnMap {
     pub client: kv_client::KvClient<Channel>,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Role {
     Leader,
     Follower,
@@ -41,7 +41,8 @@ pub struct KV {
 
     pub next_election_time: Arc<Mutex<u128>>, // this is the time the node should have been sent a AppendEntries Request
     pub last_append_entry_time: Arc<Mutex<Option<u128>>>, // this is the last time the node has received appendEntry
-    pub conn_map: Arc<Mutex<Vec<ConnMap>>>,
+
+    pub connected_hosts: Arc<Mutex<Vec<u32>>>,
 }
 
 #[tonic::async_trait]

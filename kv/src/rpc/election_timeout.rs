@@ -1,3 +1,4 @@
+use crate::connect::get_connection_client;
 use tokio::{
     sync::{broadcast::Receiver, Mutex},
     time::sleep,
@@ -23,10 +24,6 @@ pub async fn run_election_timeout(
             break;
         }
 
-        if kv_service.get_role().await == Role::Leader {
-            continue;
-        }
-
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -34,14 +31,33 @@ pub async fn run_election_timeout(
 
         let next_election_time = kv_service.get_next_election_time().await;
         if now < next_election_time {
-            sleep(Duration::from_nanos((next_election_time - now) as u64)).await;
+            if kv_service.get_role().await != Role::Follower {
+                continue;
+            }
+
+            // sleep(Duration::from_nanos((next_election_time - now) as u64)).await;
+            sleep(Duration::from_secs(1)).await;
+            kv_service.set_role(Role::Candidate).await;
+            info!(
+                "Switched to {:?} from follower",
+                kv_service.get_role().await
+            );
             continue;
         } else {
+            if kv_service.get_role().await != Role::Candidate {
+                continue;
+            }
+
             let mut vote_count = 1;
-            for conn_map in kv_service.conn_map.lock().await.iter_mut() {
+            // for conn_map in kv_service.conn_map.lock().await.iter_mut() {
+            for other_host in kv_service.connected_hosts.lock().await.iter() {
                 let current_term = kv_service.get_current_term().await;
-                let vote_response = conn_map
-                    .client
+                let client = get_connection_client(*other_host).await;
+                if client.is_none() {
+                    continue;
+                }
+                let mut client = client.unwrap();
+                let vote_response = client
                     .request_vote(RequestVoteRequest {
                         candidate_id: kv_service.host_port.clone(),
                         last_log_index: kv_service.commit_index,
@@ -57,14 +73,14 @@ pub async fn run_election_timeout(
 
                 let vote_response = vote_response.unwrap().into_inner();
                 if vote_response.vote_granted {
-                    info!("Received vote from - {}", conn_map.conn_port.clone());
+                    info!("Received vote from - {}", other_host.clone());
                     vote_count.add_assign(1);
                 } else {
                     if vote_response.term > current_term {
                         kv_service.set_current_term(vote_response.term).await;
                         break;
                     }
-                    warn!("Didnt receive vote from - {}", conn_map.conn_port.clone())
+                    warn!("Didnt receive vote from - {}", other_host.clone())
                 }
             }
 

@@ -1,7 +1,6 @@
 pub mod listen;
 pub mod rpc;
 use clap::Parser;
-use connect::connect_to_other_node;
 use listen::listen_for_connections;
 use ps::get_ps_instance;
 use rpc::{election_timeout::run_election_timeout, kv::KV, leader_actions::run_leader_actions};
@@ -53,8 +52,8 @@ async fn main() {
         )), // in nanos
         last_append_entry_time: Arc::new(Mutex::new(None)),
         role: Arc::new(Mutex::new(rpc::kv::Role::Follower)),
-        conn_map: Arc::new(Mutex::new(vec![])),
-    }; // Replace with your actual implementation
+        connected_hosts: Arc::new(Mutex::new(args.other_nodes.clone())),
+    };
 
     let kv_service_cloned = Arc::new(kv_service.clone());
     let (tx, rx) = broadcast::channel::<bool>(1);
@@ -70,13 +69,6 @@ async fn main() {
         kv_service_cloned.clone(),
         exit_rx.clone(),
     ));
-
-    for conn_port in args.other_nodes.clone() {
-        spawn(connect_to_other_node(
-            conn_port.clone(),
-            kv_service_cloned.clone(),
-        ));
-    }
 
     spawn(listen_for_connections(kv_service));
     sleep(Duration::from_secs(5)).await;

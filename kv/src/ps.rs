@@ -9,7 +9,7 @@ use std::{
 use crate::rpc::state::Log;
 
 pub async fn get_ps_instance(host_port: u32) -> Result<MicroKV> {
-    let db_path = format!("./db/{}.json", host_port);
+    let db_path = format!("./db/{}", host_port);
     if !Path::new(&db_path).exists() {
         fs::create_dir_all("./db").unwrap();
     }
