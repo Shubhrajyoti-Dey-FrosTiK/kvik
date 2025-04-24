@@ -16,10 +16,6 @@ impl KV {
             }));
         }
 
-        if request.term > current_term {
-            self.set_current_term(request.term.clone()).await;
-        }
-
         let voted_for = self.get_voted_for().await;
         let last_log_term = self.get_last_log_term().await;
 

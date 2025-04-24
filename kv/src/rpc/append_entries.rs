@@ -1,6 +1,7 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-use super::kv::{AppendEntriesRequest, AppendEntriesResponse, Role, KV};
+use super::{
+    kv::{AppendEntriesRequest, AppendEntriesResponse, Role, KV},
+    utils::get_random_election_timeout,
+};
 use tonic::{Request, Response, Status};
 use tracing::info;
 
@@ -19,18 +20,15 @@ impl KV {
         }
 
         if current_term < request.term {
+            info!(
+                "{} chosen as the leader of the system",
+                request.leader_id.clone()
+            );
             self.set_current_term(request.term.clone()).await;
             self.set_role(Role::Follower).await;
         }
 
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let upper_limit = Duration::from_millis(300).as_nanos();
-        let lower_limit = Duration::from_millis(200).as_nanos();
-        self.set_last_appendentry_time(now).await;
-        self.set_next_election_time(rand::random_range(lower_limit..upper_limit) + now)
+        self.set_next_election_time(get_random_election_timeout())
             .await;
         let current_role = self.get_role().await;
         if current_role != Role::Follower {

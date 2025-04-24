@@ -49,6 +49,10 @@ pub async fn run_leader_actions(kv_service: Arc<KV>, exit: Arc<Mutex<Receiver<bo
             let append_entries_response = append_entries_response.unwrap().into_inner();
             if append_entries_response.success {
                 if append_entries_response.term > kv_service.get_current_term().await {
+                    info!(
+                        "{} chosen as the leader of the system",
+                        connected_host.clone()
+                    );
                     kv_service
                         .set_current_term(append_entries_response.term)
                         .await;
