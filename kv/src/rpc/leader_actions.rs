@@ -39,7 +39,8 @@ pub async fn run_leader_actions(kv_service: Arc<KV>, exit: Arc<Mutex<Receiver<bo
 
             if append_entries_response.is_err() {
                 warn!(
-                    "Error appending entries to - {}",
+                    "Error appending entries to - {} | {}",
+                    connected_host.clone(),
                     append_entries_response.err().unwrap()
                 );
                 continue;
