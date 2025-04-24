@@ -22,6 +22,11 @@ pub async fn get_ps_instance(host_port: u32) -> Result<MicroKV> {
         micro_kv.put::<u64>("currentTerm", &0).unwrap();
     }
 
+    let voted_for = micro_kv.get_unwrap::<Option<u32>>("votedFor");
+    if voted_for.is_err() {
+        micro_kv.put::<Option<u32>>("votedFor", &None).unwrap();
+    }
+
     let log = micro_kv.get_unwrap::<Vec<Log>>("log");
     if log.is_err() {
         micro_kv.put::<Vec<Log>>("log", &vec![]).unwrap();

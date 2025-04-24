@@ -70,6 +70,10 @@ async fn main() {
         exit_rx.clone(),
     ));
 
+    // For actual use
+    // listen_for_connections(kv_service).await.unwrap();
+
+    // For testing
     spawn(listen_for_connections(kv_service));
     sleep(Duration::from_secs(5)).await;
     tx.send(true).unwrap(); // exit

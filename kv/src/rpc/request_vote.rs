@@ -27,7 +27,7 @@ impl KV {
                 || (request.last_log_term == last_log_term
                     && request.last_log_index >= self.commit_index))
         {
-            self.set_voted_for(request.candidate_id.clone()).await;
+            self.set_voted_for(Some(request.candidate_id.clone())).await;
             return Ok(Response::new(RequestVoteResponse {
                 term: current_term,
                 vote_granted: true,

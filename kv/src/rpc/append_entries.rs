@@ -19,6 +19,10 @@ impl KV {
             }));
         }
 
+        if self.get_voted_for().await.is_some() {
+            self.set_voted_for(None).await;
+        }
+
         if current_term < request.term {
             info!(
                 "{} chosen as the leader of the system",

@@ -24,18 +24,14 @@ impl KV {
     }
 
     pub async fn get_voted_for(&self) -> Option<u32> {
-        let voted_for = self.persistent_store.get_unwrap::<u32>("votedFor");
-
-        if voted_for.is_err() {
-            return None;
-        }
-
-        return Some(voted_for.unwrap());
+        self.persistent_store
+            .get_unwrap::<Option<u32>>("votedFor")
+            .unwrap()
     }
 
-    pub async fn set_voted_for(&self, voted_for: u32) {
+    pub async fn set_voted_for(&self, voted_for: Option<u32>) {
         self.persistent_store
-            .put::<u32>("votedFor", &voted_for)
+            .put::<Option<u32>>("votedFor", &voted_for)
             .unwrap();
     }
 
