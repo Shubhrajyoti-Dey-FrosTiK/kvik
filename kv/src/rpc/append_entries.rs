@@ -1,5 +1,6 @@
 use super::{
     kv::{AppendEntriesRequest, AppendEntriesResponse, Role, KV},
+    state::PRStatistics,
     utils::get_random_election_timeout,
 };
 use tonic::{Request, Response, Status};
@@ -30,6 +31,11 @@ impl KV {
             );
             self.set_current_term(request.term.clone()).await;
             self.set_role(Role::Follower).await;
+        }
+
+        if request.pr_statistics.is_some() {
+            self.set_pr_statistics(PRStatistics::from_proto(request.pr_statistics.unwrap()))
+                .await;
         }
 
         self.set_next_election_time(get_random_election_timeout())

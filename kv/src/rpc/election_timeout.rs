@@ -45,6 +45,8 @@ pub async fn run_election_timeout(
             kv_service.get_role().await
         );
 
+        info!("PR Statistics {:#?}", kv_service.get_pr_statistics().await);
+
         let mut vote_count = 1;
         let current_term = kv_service.get_current_term().await;
         // for conn_map in kv_service.conn_map.lock().await.iter_mut() {

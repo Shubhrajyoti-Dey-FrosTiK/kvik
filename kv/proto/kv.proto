@@ -14,6 +14,7 @@ message AppendEntriesRequest {
    uint64 prevLogTerm = 4;
    repeated string entries = 5;
    uint64 leaderCommit = 6;
+   optional PRStatistics pr_statistics = 7;
 }
 
 message AppendEntriesResponse {
@@ -31,4 +32,11 @@ message RequestVoteRequest {
 message RequestVoteResponse {
    uint64 term = 1;
    bool voteGranted = 2;
+}
+
+message PRStatistics {
+   map<uint32, uint64> request_served = 1;
+   map<uint32, uint64> average_latency = 2;
+   map<uint32, uint64> crash_count = 3;
+   map<uint32, uint64> pr = 4;
 }

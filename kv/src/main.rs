@@ -25,6 +25,9 @@ struct Args {
 
     #[arg(short, long)]
     other_nodes: Vec<u32>,
+
+    #[arg(short, long)]
+    pr: bool,
 }
 
 #[tokio::main]
@@ -36,7 +39,9 @@ async fn main() {
         .as_nanos();
     info!("NODE STARTED AT  -  {:#?}", now);
     let args = Arc::new(Args::parse());
-    let ps = get_ps_instance(args.host_port.clone()).await.unwrap();
+    let ps = get_ps_instance(args.host_port.clone(), args.other_nodes.clone())
+        .await
+        .unwrap();
 
     let kv_service = KV {
         host_port: args.host_port.clone(),
@@ -71,10 +76,10 @@ async fn main() {
     ));
 
     // For actual use
-    // listen_for_connections(kv_service).await.unwrap();
+    listen_for_connections(kv_service).await.unwrap();
 
     // For testing
-    spawn(listen_for_connections(kv_service));
-    sleep(Duration::from_secs(5)).await;
-    tx.send(true).unwrap(); // exit
+    // spawn(listen_for_connections(kv_service));
+    // sleep(Duration::from_secs(5)).await;
+    // tx.send(true).unwrap(); // exit
 }

@@ -1,3 +1,4 @@
+use crate::rpc::state::{Log, PRStatistics};
 use anyhow::Result;
 use microkv::MicroKV;
 use std::{
@@ -6,9 +7,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::rpc::state::Log;
-
-pub async fn get_ps_instance(host_port: u32) -> Result<MicroKV> {
+pub async fn get_ps_instance(host_port: u32, other_nodes: Vec<u32>) -> Result<MicroKV> {
     let db_path = format!("./db/{}", host_port);
     if !Path::new(&db_path).exists() {
         fs::create_dir_all("./db").unwrap();
@@ -31,6 +30,13 @@ pub async fn get_ps_instance(host_port: u32) -> Result<MicroKV> {
     if log.is_err() {
         micro_kv.put::<Vec<Log>>("log", &vec![]).unwrap();
     }
+
+    PRStatistics::setup(micro_kv.clone(), {
+        let mut nodes = vec![host_port];
+        nodes.extend(other_nodes);
+        nodes
+    })
+    .await;
 
     Ok(micro_kv)
 }
