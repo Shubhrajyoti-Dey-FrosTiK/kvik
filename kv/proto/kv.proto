@@ -34,9 +34,15 @@ message RequestVoteResponse {
    bool voteGranted = 2;
 }
 
+message GlobalStatistics {
+   uint64 request_served = 1;
+   uint64 heartbeat_cycles = 2;
+}
+
 message PRStatistics {
    map<uint32, uint64> request_served = 1;
    map<uint32, uint64> average_latency = 2;
    map<uint32, uint64> crash_count = 3;
-   map<uint32, uint64> pr = 4;
+   map<uint32, float> pr = 4;
+   GlobalStatistics global = 5;
 }

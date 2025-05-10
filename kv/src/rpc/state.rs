@@ -1,7 +1,13 @@
-use super::kv::{PrStatistics, Role, KV};
+use super::{
+    kv::{self, PrStatistics, Role, KV},
+    utils::get_pr_of_system,
+};
 use microkv::MicroKV;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, ops::DerefMut};
+use std::{
+    collections::HashMap,
+    ops::{AddAssign, DerefMut, Mul, MulAssign},
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct Log {
@@ -10,11 +16,34 @@ pub struct Log {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct GlobalStatistics {
+    pub request_served: u64, // total number of requests served. Leader - 1 (per cycle), Follower - 1 (n-1 followers). Total n (ideally) in a cycle
+    pub heartbeat_cycles: u64, // total number of heartbeat cycles.
+}
+
+impl GlobalStatistics {
+    pub fn from_proto(proto: kv::GlobalStatistics) -> Self {
+        Self {
+            heartbeat_cycles: proto.heartbeat_cycles,
+            request_served: proto.request_served,
+        }
+    }
+
+    pub fn to_proto(&self) -> kv::GlobalStatistics {
+        kv::GlobalStatistics {
+            heartbeat_cycles: self.heartbeat_cycles,
+            request_served: self.request_served,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PRStatistics {
     pub request_served: HashMap<u32, u64>,
     pub average_latency: HashMap<u32, u64>,
     pub crash_count: HashMap<u32, u64>,
-    pub pr: HashMap<u32, u64>,
+    pub pr: HashMap<u32, f32>,
+    pub global: GlobalStatistics,
 }
 
 impl PRStatistics {
@@ -26,6 +55,10 @@ impl PRStatistics {
             crash_count: zero_map.clone(),
             pr,
             request_served: zero_map.clone(),
+            global: GlobalStatistics {
+                request_served: 0,
+                heartbeat_cycles: 0,
+            },
         }
     }
 
@@ -33,7 +66,7 @@ impl PRStatistics {
         let mut pr = HashMap::new();
         let mut zero_map = HashMap::new();
         for node in nodes.iter() {
-            pr.insert(*node, 1 / (nodes.len() as u64));
+            pr.insert(*node, 1.0 / (nodes.len() as f32));
             zero_map.insert(*node, 0 as u64);
         }
         Self {
@@ -41,6 +74,10 @@ impl PRStatistics {
             crash_count: zero_map.clone(),
             pr,
             request_served: zero_map.clone(),
+            global: GlobalStatistics {
+                request_served: 0,
+                heartbeat_cycles: 0,
+            },
         }
     }
 
@@ -61,6 +98,7 @@ impl PRStatistics {
             average_latency: self.average_latency.clone(),
             crash_count: self.crash_count.clone(),
             pr: self.pr.clone(),
+            global: Some(self.global.to_proto()),
         }
     }
 
@@ -70,6 +108,7 @@ impl PRStatistics {
             average_latency: pr_statistics.average_latency,
             crash_count: pr_statistics.crash_count,
             pr: pr_statistics.pr,
+            global: GlobalStatistics::from_proto(pr_statistics.global.unwrap()),
         }
     }
 }
@@ -170,9 +209,39 @@ impl KV {
         }
 
         for (host, crash_count) in pr_statistics.crash_count {
+            let old_crash_count = old_pr_statistics.crash_count.get(&host).unwrap();
             new_pr_statistics
                 .crash_count
-                .insert(host.clone(), crash_count + 1);
+                .insert(host.clone(), crash_count + old_crash_count.clone());
+        }
+
+        new_pr_statistics
+            .global
+            .heartbeat_cycles
+            .add_assign(pr_statistics.global.heartbeat_cycles); // Basically increment the heartbeat cycles
+        new_pr_statistics
+            .global
+            .request_served
+            .add_assign(pr_statistics.global.request_served);
+
+        let num_of_nodes = self.get_all_nodes().await.len();
+        let (leader_pr, follower_pr) = get_pr_of_system(num_of_nodes);
+
+        let mut all_nodes = self.connected_hosts.lock().await.clone();
+        all_nodes.push(self.host_port.clone());
+
+        for node in all_nodes.iter() {
+            let node_request_served = new_pr_statistics.request_served.get(node).unwrap_or(&0);
+            let request_served_ratio = (node_request_served.clone() as f32)
+                / (new_pr_statistics.global.request_served as f32);
+
+            let mut pr = if node.clone() == self.host_port {
+                leader_pr
+            } else {
+                follower_pr
+            };
+            pr.mul_assign(request_served_ratio);
+            new_pr_statistics.pr.insert(node.clone(), pr);
         }
 
         self.persistent_store

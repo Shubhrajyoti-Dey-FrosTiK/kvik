@@ -8,6 +8,7 @@ tonic::include_proto!("kv");
 pub struct LeaderState {
     pub next_index: Vec<u64>, // for each server, index of the next log entry to send to that server (initialized to leader last log index + 1)
     pub match_index: Vec<u64>, // for each server, index of highest log entry known to be replicated on server (initialized to 0, increases monotonically)
+    pub last_connected_hosts: Vec<u32>, // the conected hosts in the last heartbeat cycle
 }
 
 #[derive(Clone)]
@@ -37,7 +38,7 @@ pub struct KV {
     pub commit_index: u64, // index of highest log entry known to be committed (initialized to 0, increases monotonically)
     pub last_applied: u64, // index of highest log entry applied to state machine (initialized to 0, increases monotonically)
     pub role: Arc<Mutex<Role>>,
-    pub leader_state: Option<LeaderState>, // state of the leader node | Only if the node is the leader, this data is present
+    pub leader_state: Arc<Mutex<Option<LeaderState>>>, // state of the leader node | Only if the node is the leader, this data is present
 
     pub next_election_time: Arc<Mutex<u128>>, // this is the time the node should have been sent a AppendEntries Request
     pub last_append_entry_time: Arc<Mutex<Option<u128>>>, // this is the last time the node has received appendEntry

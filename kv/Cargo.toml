@@ -25,6 +25,7 @@ futures = "*"
 prost-types = "0.13.5"
 rand = { version = "*", features = ["thread_rng"] }
 microkv = { version = "0.2.9" }
+pagerank_rs = "0.1.0"
 
 [build-dependencies]
 tonic-build = "0.13.0"

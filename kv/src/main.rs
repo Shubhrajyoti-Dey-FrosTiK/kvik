@@ -49,7 +49,7 @@ async fn main() {
         persistent_store: ps,
         commit_index: 0,
         last_applied: 0,
-        leader_state: None, // Not a leader in the beginning
+        leader_state: Arc::new(Mutex::new(None)), // Not a leader in the beginning
         next_election_time: Arc::new(Mutex::new(
             rand::random_range(
                 Duration::from_millis(150).as_nanos()..Duration::from_millis(300).as_nanos(),

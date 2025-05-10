@@ -1,7 +1,10 @@
 use super::kv::{RequestVoteRequest, Role, KV};
 use crate::{
     connect::get_connection_client,
-    rpc::utils::{get_current_time_nanosecs, get_random_election_timeout},
+    rpc::{
+        kv::LeaderState,
+        utils::{get_current_time_nanosecs, get_random_election_timeout},
+    },
 };
 use std::{ops::AddAssign, sync::Arc, time::Duration};
 use tokio::{
@@ -90,6 +93,11 @@ pub async fn run_election_timeout(
                 vote_count,
                 total_nodes.clone()
             );
+            *kv_service.leader_state.lock().await = Some(LeaderState {
+                last_connected_hosts: vec![],
+                match_index: vec![],
+                next_index: vec![],
+            });
             kv_service.set_role(Role::Leader).await;
             kv_service.set_current_term(current_term + 1).await;
         } else {

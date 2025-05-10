@@ -1,5 +1,5 @@
 use super::{
-    kv::{AppendEntriesRequest, Role, KV},
+    kv::{AppendEntriesRequest, LeaderState, Role, KV},
     state::PRStatistics,
     utils::get_current_time_nanosecs,
 };
@@ -27,10 +27,26 @@ pub async fn run_leader_actions(kv_service: Arc<KV>, exit: Arc<Mutex<Receiver<bo
         let mut current_cycle_pr_statistics = PRStatistics::empty();
         let mut average_leader_latency = 0;
         let mut active_nodes = 0;
+
+        let prev_leader_state = kv_service.leader_state.lock().await.clone().unwrap();
+        let mut current_leader_state = LeaderState {
+            last_connected_hosts: vec![],
+            match_index: prev_leader_state.match_index.clone(),
+            next_index: prev_leader_state.next_index.clone(),
+        };
+
         // Send AppendEntriesRPC to all connected clients
         for connected_host in kv_service.connected_hosts.lock().await.iter() {
             let client = get_connection_client(*connected_host).await;
             if client.is_none() {
+                if prev_leader_state
+                    .last_connected_hosts
+                    .contains(connected_host)
+                {
+                    current_cycle_pr_statistics
+                        .crash_count
+                        .insert(*connected_host, 1);
+                }
                 continue;
             }
             let mut client = client.unwrap();
@@ -82,13 +98,31 @@ pub async fn run_leader_actions(kv_service: Arc<KV>, exit: Arc<Mutex<Receiver<bo
                 current_cycle_pr_statistics
                     .request_served
                     .insert(*connected_host, 1);
-
+                current_cycle_pr_statistics
+                    .global
+                    .request_served
+                    .add_assign(1);
                 // info!("Success appending entries to {}", connected_host);
+
+                current_leader_state
+                    .last_connected_hosts
+                    .push(connected_host.clone());
             } else {
                 warn!("Didnt succeed appending entries to {}", connected_host)
             }
         }
 
+        // Update global states
+        current_cycle_pr_statistics
+            .global
+            .request_served
+            .add_assign(1);
+        current_cycle_pr_statistics
+            .global
+            .heartbeat_cycles
+            .add_assign(1);
+
+        // Update leader states
         current_cycle_pr_statistics.average_latency.insert(
             kv_service.host_port.clone(),
             average_leader_latency / active_nodes,
@@ -96,7 +130,7 @@ pub async fn run_leader_actions(kv_service: Arc<KV>, exit: Arc<Mutex<Receiver<bo
         current_cycle_pr_statistics
             .request_served
             .insert(kv_service.host_port.clone(), 1);
-
+        *kv_service.leader_state.lock().await = Some(current_leader_state);
         kv_service
             .update_pr_statistics(current_cycle_pr_statistics)
             .await;
