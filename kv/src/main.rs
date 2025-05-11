@@ -58,6 +58,7 @@ async fn main() {
         last_append_entry_time: Arc::new(Mutex::new(None)),
         role: Arc::new(Mutex::new(rpc::kv::Role::Follower)),
         connected_hosts: Arc::new(Mutex::new(args.other_nodes.clone())),
+        pr_enabled: args.pr,
     };
 
     let kv_service_cloned = Arc::new(kv_service.clone());

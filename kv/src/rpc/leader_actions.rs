@@ -28,7 +28,17 @@ pub async fn run_leader_actions(kv_service: Arc<KV>, exit: Arc<Mutex<Receiver<bo
         let mut average_leader_latency = 0;
         let mut active_nodes = 0;
 
-        let prev_leader_state = kv_service.leader_state.lock().await.clone().unwrap();
+        let prev_leader_state =
+            kv_service
+                .leader_state
+                .lock()
+                .await
+                .clone()
+                .unwrap_or(LeaderState {
+                    last_connected_hosts: vec![],
+                    match_index: vec![],
+                    next_index: vec![],
+                });
         let mut current_leader_state = LeaderState {
             last_connected_hosts: vec![],
             match_index: prev_leader_state.match_index.clone(),
@@ -125,7 +135,7 @@ pub async fn run_leader_actions(kv_service: Arc<KV>, exit: Arc<Mutex<Receiver<bo
         // Update leader states
         current_cycle_pr_statistics.average_latency.insert(
             kv_service.host_port.clone(),
-            average_leader_latency / active_nodes,
+            average_leader_latency / active_nodes.max(1),
         );
         current_cycle_pr_statistics
             .request_served

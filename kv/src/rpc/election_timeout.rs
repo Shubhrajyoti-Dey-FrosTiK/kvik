@@ -2,7 +2,7 @@ use super::kv::{RequestVoteRequest, Role, KV};
 use crate::{
     connect::get_connection_client,
     rpc::{
-        kv::LeaderState,
+        kv::{InformNextTermRequst, LeaderState},
         utils::{get_current_time_nanosecs, get_random_election_timeout},
     },
 };
@@ -40,6 +40,66 @@ pub async fn run_election_timeout(
 
         if kv_service.get_role().await != Role::Follower {
             continue;
+        }
+
+        if kv_service.pr_enabled {
+            let pr_statistics = kv_service.get_pr_statistics().await;
+            let mut nodes: Vec<(&u32, &f32)> = pr_statistics.pr.iter().collect();
+            nodes.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+            if nodes.iter().all(|(_, pr)| *pr == nodes[0].1) {
+                warn!("All nodes have equal PR values, no leader elected from pr");
+            } else {
+                let mut leader_selected = false;
+
+                for (node, pr) in nodes {
+                    let node = node.clone();
+
+                    if node == kv_service.host_port {
+                        kv_service.set_role(Role::Leader).await;
+                        leader_selected = true;
+                        info!(
+                            "Switched to {:?} from follower",
+                            kv_service.get_role().await
+                        );
+                        break;
+                    }
+
+                    let client = get_connection_client(node).await;
+
+                    if client.is_none() {
+                        warn!("{} is not selected to be leader as not ready", node.clone());
+                        continue;
+                    }
+                    let mut client = client.unwrap();
+                    let response = client
+                        .inform_next_tern(InformNextTermRequst {
+                            leader_id: node,
+                            term: kv_service.get_current_term().await + 1,
+                        })
+                        .await;
+
+                    if response.is_err() {
+                        warn!("Errored out informing {}", node);
+                        continue;
+                    }
+
+                    let response = response.unwrap().into_inner();
+                    if response.success == false {
+                        warn!("Refused to be leader {}", node);
+                    }
+
+                    leader_selected = true;
+                    break;
+                }
+
+                if leader_selected {
+                    kv_service
+                        .set_next_election_time(get_random_election_timeout())
+                        .await;
+                    continue;
+                }
+            }
         }
 
         kv_service.set_role(Role::Candidate).await;

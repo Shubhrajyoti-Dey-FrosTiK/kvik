@@ -6,7 +6,7 @@ use microkv::MicroKV;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    ops::{AddAssign, DerefMut, Mul, MulAssign},
+    ops::{AddAssign, DerefMut, MulAssign},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -232,15 +232,24 @@ impl KV {
 
         for node in all_nodes.iter() {
             let node_request_served = new_pr_statistics.request_served.get(node).unwrap_or(&0);
+            let node_average_latency = new_pr_statistics.average_latency.get(node).unwrap_or(&0);
+            let node_crashes = new_pr_statistics.crash_count.get(node).unwrap_or(&0);
+
             let request_served_ratio = (node_request_served.clone() as f32)
-                / (new_pr_statistics.global.request_served as f32);
+                / ((new_pr_statistics.global.request_served.max(1)) as f32);
+            let crash_constant = f32::powi(
+                (all_nodes.len() - 1) as f32 / all_nodes.len() as f32,
+                node_crashes.clone() as i32,
+            );
+            let latency_constant = 1.0 / node_average_latency.clone().max(1) as f32;
 
             let mut pr = if node.clone() == self.host_port {
                 leader_pr
             } else {
                 follower_pr
             };
-            pr.mul_assign(request_served_ratio);
+
+            pr.mul_assign(request_served_ratio * crash_constant * latency_constant);
             new_pr_statistics.pr.insert(node.clone(), pr);
         }
 

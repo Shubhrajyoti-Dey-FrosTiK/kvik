@@ -44,6 +44,8 @@ pub struct KV {
     pub last_append_entry_time: Arc<Mutex<Option<u128>>>, // this is the last time the node has received appendEntry
 
     pub connected_hosts: Arc<Mutex<Vec<u32>>>,
+
+    pub pr_enabled: bool,
 }
 
 #[tonic::async_trait]
@@ -60,5 +62,12 @@ impl kv_server::Kv for KV {
         request: Request<AppendEntriesRequest>, // Accept request of type HelloRequest
     ) -> Result<Response<AppendEntriesResponse>, Status> {
         return self.append_entries_handler(request).await;
+    }
+
+    async fn inform_next_tern(
+        &self,
+        request: Request<InformNextTermRequst>, // Accept request of type HelloRequest
+    ) -> Result<Response<InformNextTermResponse>, Status> {
+        return self.inform_next_term_handler(request).await;
     }
 }

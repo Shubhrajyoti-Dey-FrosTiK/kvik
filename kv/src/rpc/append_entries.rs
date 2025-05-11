@@ -9,7 +9,7 @@ use tracing::info;
 impl KV {
     pub async fn append_entries_handler(
         &self,
-        request: Request<AppendEntriesRequest>, // Accept request of type HelloRequest
+        request: Request<AppendEntriesRequest>,
     ) -> Result<Response<AppendEntriesResponse>, Status> {
         let request = request.into_inner();
         let current_term = self.get_current_term().await;
